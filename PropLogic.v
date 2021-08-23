@@ -141,21 +141,46 @@ Proof.
   - simpl in H2. discriminate.
 Qed.
 
-(* Hilbert Calculus *)
+Fixpoint In {A : Type} (x : A) (l : list A) : Prop :=
+  match l with
+  | nil => False
+  | cons x' l' => x' = x /\ In x l'
+  end.
 
-Inductive HilbertAxiom: Proposition -> Prop :=
-  | HAx1: forall A B, HilbertAxiom(A → (B → A))
-  | HAx2: forall A B C, HilbertAxiom((A → (B → C)) → ((A → B) → (A → C)))
-  | HAx3: forall A B, HilbertAxiom(((¬ B) → (¬ A)) → (A → B)).
+Notation "[ ]" := nil.
+Notation "[ x ; .. ; y ]" := (cons x .. (cons y []) ..).
 
-Inductive HilbertCalculus: list Proposition -> Proposition -> Prop :=
-  | HC2: forall U A, HilbertAxiom A -> HilbertCalculus U A
-  | HCMP: forall U A B, HilbertCalculus U (A → B) -> HilbertCalculus U A -> HilbertCalculus U B.
+(* Natural Deduction *)
 
-Notation "U |-H A" := (HilbertCalculus U A) (at level 7).
+Reserved Notation "U |- A" (at level 80).
+Inductive Nd: list Proposition -> Proposition -> Prop :=
+| Repeat U A (H: In A U): U |- A
+| NotE U P (H: U |- ¬ (¬ P)): U |- P
+| NotI U P Q (H1: U |- P) (H2: U |- Q) (H3: U |- ¬ Q): U |- ¬ P
+| AndE1 U A B (H: U |- (A ∧ B)): U |- A
+| AndE2 U A B (H: U |- (A ∧ B)): U |- B
+| AndI U A B (H1: U |- A) (H2: U |- B): U |- (A ∧ B)
+| OrE U P Q R (H1: U |- P ∨ Q) (H2: U |- P → R) (H3: U |- Q → R): U |- R
+| OrI1 U P Q (H1: U |- P): U |- P ∨ Q
+| OrI2 U P Q (H1: U |- P): U |- Q ∨ P
+| ImpE U P Q (H1: U |- P) (H2: U |- P → Q): U |- Q
+| ImpI U P Q (H: (P :: U)%list |- Q): U |- P → Q
+where "U |- A" := (Nd U A).
 
-Theorem A_implies_A: forall A B: Proposition,
-  nil |-H (A → A).
+Theorem and_is_commutative: forall Γ A B,
+  Γ |- A ∧ B -> Γ |- B ∧ A.
 Proof.
-  intros.
-  apply (HC2 nil (HAx1 A (B → A))).
+  intros Γ A B H1.
+  apply (AndE1 Γ A B) in H1 as H2.
+  apply (AndE2 Γ A B) in H1 as H3.
+  apply (AndI Γ B A H3) in H2 as H4.
+  apply H4.
+Qed.
+
+Example example_1: forall Γ P Q,
+  Γ |- ¬ P /\ Γ |- Q -> Γ |- ¬(P ∧ Q).
+Proof.
+  intros Γ P Q.
+  intros [H1 H2].
+  apply (NotI _ _ P). Abort.
+
