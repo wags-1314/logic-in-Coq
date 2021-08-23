@@ -26,7 +26,7 @@ Proof.
 Qed.
 
 Example example_1: forall Γ P Q,
-  ¬ P :: Q :: Γ |- ¬(P ∧ Q).
+Γ |- ¬ P /\ Γ |- Q -> Γ |- ¬(P ∧ Q).
 Proof.
-  intros Γ P Q.
+  intros Γ P Q [H1 H2].
   apply (NotI _ _ P). Admitted.
