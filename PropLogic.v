@@ -144,7 +144,7 @@ Qed.
 Fixpoint In {A : Type} (x : A) (l : list A) : Prop :=
   match l with
   | nil => False
-  | cons x' l' => x' = x /\ In x l'
+  | cons x' l' => x' = x \/ In x l'
   end.
 
 Notation "[ ]" := nil.
