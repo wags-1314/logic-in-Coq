@@ -26,6 +26,12 @@ Fixpoint valuation v P: bool :=
 
 (* Satisfiability, Validity etc. *)
 
+Fixpoint In {A : Type} (x : A) (l : list A) : Prop :=
+  match l with
+  | nil => False
+  | cons x' l' => x' = x \/ In x l'
+  end.
+
 Definition satisfiable P: Prop := 
   exists v, valuation v P = true.
 
@@ -38,119 +44,124 @@ Definition unsatisfiable P: Prop :=
 Definition falsifiable P: Prop :=
   exists v, valuation v P = false.
 
-Lemma negb_b_false_implies_b_true: forall b,
-  negb b = false -> b = true.
-Proof.
-  intros.
-  destruct b eqn:E.
-  - reflexivity.
-  - simpl in H. discriminate.
-Qed. 
+Definition Satisfies v Γ: Prop :=
+  forall A, In A Γ -> valuation v A = true.
 
-Theorem P_valid_iff_notP_unsatisfiable: forall P,
-  valid P <-> unsatisfiable ¬ P.
-Proof.
-  unfold valid.
-  unfold unsatisfiable.
-  simpl.
-  split.
-  - intros. rewrite H. simpl. reflexivity.
-  - intros. apply negb_b_false_implies_b_true. apply H.
-Qed.
-
-Theorem P_satisfiable_iff_notP_falsifiable: forall P,
-  satisfiable P <-> falsifiable ¬ P.
-Proof.
-  unfold satisfiable.
-  unfold falsifiable.
-  split.
-  - intros. destruct H as [v H]. exists v. simpl.
-    rewrite H. reflexivity.
-  - intros. destruct H as [v H]. exists v. simpl.
-    simpl in H. apply negb_b_false_implies_b_true.
-    apply H.
-Qed.
-
-Fixpoint models v (U: list Proposition) := 
-  match U with
+Fixpoint satisfies v Γ: bool :=
+  match Γ with
   | nil => true
-  | (P :: U')%list => ((valuation v P) && (models v U'))%bool
+  | (p' :: Γ')%list => andb (valuation v p') (satisfies v Γ')
   end.
 
-Definition set_satisfiable U := 
-  exists v, models v U = true.
-
-Definition set_unsatisfiable U :=
-  forall v, models v U = false.
-
-Lemma b_andb_true_is_b: forall b,
-  b = true -> (b && true)%bool = true.
+Theorem Satisfies_to_split: forall v Γ a,
+  Satisfies v (a :: Γ)%list -> (valuation v a) = true /\ Satisfies v Γ.
 Proof.
+  unfold Satisfies.
   intros.
-  destruct b.
-  - reflexivity.
-  - discriminate.
+  split.
+  - apply H.
+    simpl.
+    left.
+    reflexivity.
+  - intros.
+    apply H.
+    simpl.
+    right.
+    apply H0.
 Qed. 
 
-Lemma b_andb_false_is_false: forall b,
-  (b && false)%bool = false.
+Theorem split_to_Satisfies: forall v Γ a,
+  (valuation v a) = true /\ Satisfies v Γ -> Satisfies v (a::Γ)%list.
 Proof.
-  destruct b.
-  - reflexivity.
-  - reflexivity.
-Qed. 
-  
-Theorem set_satisifable_cons_valid: forall U P,
-  set_satisfiable U /\ valid P -> set_satisfiable (P :: U)%list.
-Proof.
-  unfold set_satisfiable.
-  unfold valid.
+  intros v Γ A [H1 H2].
+  unfold Satisfies.
   intros.
-  destruct H as [[v H1] H2].
-  exists v.
-  destruct U.
-  - simpl. rewrite H2. reflexivity.
-  - simpl. simpl in H1. rewrite H1.
-    apply b_andb_true_is_b. apply H2.
-Qed.
+  simpl in H.
+  destruct H as [H | H].
+  - rewrite <- H. apply H1.
+  - unfold Satisfies in H2. apply H2.
+    apply H.
+Qed.  
 
-Theorem unsatisfiable_cons_is_unsatisifiable: forall U P,
-  set_unsatisfiable U -> set_unsatisfiable (P :: U)%list.
+Theorem satisfy_chain: forall v Γ A,
+  (valuation v A) = true -> Satisfies v Γ -> Satisfies v (A :: Γ)%list.
 Proof.
-  unfold set_unsatisfiable.
   intros.
-  simpl.
-  rewrite H.
-  apply b_andb_false_is_false.
+  apply split_to_Satisfies.
+  split.
+  apply H.
+  apply H0.
 Qed.
 
-Definition consequence U A := 
-  forall v, models v U = true -> valuation v A = true.
+Definition models Γ A: Prop :=
+  forall v, Satisfies v Γ -> valuation v A = true.
 
-Notation "U |= A" := (consequence U A) (at level 7).
-
-Theorem consequence_cons: forall U A B,
-  U |= A -> (B :: U)%list |= A.
-Proof.
-  unfold consequence.
-  intros U A B H1 v H2.
-  simpl in H2.
-  apply H1.
-  destruct (valuation v B) eqn:E.
-  - simpl in H2. apply H2.
-  - simpl in H2. discriminate.
-Qed.
-
-Fixpoint In {A : Type} (x : A) (l : list A) : Prop :=
-  match l with
-  | nil => False
-  | cons x' l' => x' = x \/ In x l'
-  end.
+Notation "Γ |= A" := (models Γ A) (at level 10).
 
 Notation "[ ]" := nil.
 Notation "[ x ; .. ; y ]" := (cons x .. (cons y []) ..).
 
-(* Natural Deduction *)
+Lemma and_both_true: forall p q,
+  (p && q)%bool = true -> p = true /\ q = true.
+Proof.
+  destruct p, q;
+  simpl;
+  intros.
+  - split; reflexivity.
+  - discriminate.
+  - discriminate.
+  - discriminate.
+Qed.
+
+Lemma or_either_true: forall p q,
+  (p || q)% bool = true -> p = true \/ q = true.
+Proof.
+  destruct p, q.
+  simpl;
+  intros.
+  - left. reflexivity.
+  - left. reflexivity.
+  - right. reflexivity.
+  - discriminate.
+Qed.  
+
+
+Theorem Satisfies_iff_satisfies: forall Γ v,
+  Satisfies v Γ <-> satisfies v Γ = true.
+Proof.
+  intros.
+  split.
+  - induction Γ.
+    + intros. simpl. reflexivity.
+    + intros.
+      simpl satisfies. 
+      apply Satisfies_to_split in H.
+      destruct H as [H1 H2].
+      rewrite H1.
+      simpl.
+      apply IHΓ.
+      apply H2.
+  - induction Γ.
+    simpl.
+    + intros.
+      unfold Satisfies.
+      simpl.
+      intros.
+      inversion H0.
+    + intros. apply split_to_Satisfies.
+      split.
+      * simpl in H.
+        destruct (valuation v a).
+        --  reflexivity.
+        --  simpl in H.
+            discriminate H.
+      * apply IHΓ.
+        simpl in H.
+        apply and_both_true in H.
+        destruct H as [_ H].
+        apply H.
+Qed.
+        
 
 
 
